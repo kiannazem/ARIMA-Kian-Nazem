@@ -1,0 +1,58 @@
+---
+title: "Homework 7"
+output: html_document
+date: "2024-11-21"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readxl)
+library(forecast)
+library(tseries)
+library(TTR)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+```
+```{r}
+Inflation_Data <- read_excel("~/Downloads/CPI - Dataset No Description.xlsx")
+```
+```{r}
+Inflation_Data$Annual_Inflation <- rowMeans(Inflation_Data[, c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                                                               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")], 
+                                            na.rm = TRUE)
+```
+
+```{r}
+inflation_ts <- ts(Inflation_Data$Annual_Inflation, start = min(Inflation_Data$Year), frequency = 1)
+```
+```{r}
+plot(inflation_ts)
+```
+```{r}
+tsdisplay(inflation_ts)
+```
+
+```{r}
+arima_model <- auto.arima(inflation_ts, seasonal = FALSE)
+summary(arima_model)
+```
+```{r}
+residuals_arima <- residuals(arima_model)
+tsdisplay(residuals_arima)
+```
+```{r}
+forecast_values <- forecast(arima_model, h = 5)
+plot(forecast_values)
+```
+```{r}
+train_data <- window(inflation_ts, end = c(max(Inflation_Data$Year) - 5))
+test_data <- window(inflation_ts, start = c(max(Inflation_Data$Year) - 4))
+arima_train_model <- auto.arima(train_data, seasonal = FALSE)
+test_forecast <- forecast(arima_train_model, h = 5)
+accuracy(test_forecast, test_data)
+```
+The ARIMA(0,2,0) model was chosen for the inflation dataset, meaning there is no autoregression since p=0, two differences to make the data stationary since d=2, and no moving averages since q=0. The model’s residual variance is 33.03, with a log-likelihood of -28.51, which reflects how well it fits the data. The AIC (59.01) and BIC (59.21) scores show the model balances simplicity and accuracy. On the training set, the performance is strong, with a low Mean Error of 0.69 and a MAPE of 1.33%, suggesting the model works well on past data. Looking at the residuals, they hover around zero without showing any clear patterns, meaning the model captures most of the trends. The ACF and PACF plots confirm that there’s no significant correlation left in the residuals, which is what we want. That said, there’s a noticeable spike in the residuals around 2022, which might point to some structural change or event that the model didn’t fully account for. The forecast shows inflation continuing to rise over the next five periods, with a range of uncertainty captured by the confidence intervals. While the training set performance is solid, the test set accuracy drops, with a higher RMSE of 25.79 and MAPE of 7.04%. Overall, the ARIMA(0,2,0) model does a decent job capturing the trend and making reasonable forecasts. However, the dip in accuracy on test data shows that the model struggles with some of the variability in future trends. Adding external factors or reexamining the jump in residuals around 2022 could help improve its performance.
